@@ -129,12 +129,10 @@ class PVP(ABC):
             parts_b = [x if isinstance(x, tuple) else (x, False) for x in parts_b]
             parts_b = [(tokenizer.encode(x, add_special_tokens=False, **kwargs), s) for x, s in parts_b if x]
 
-        # self.truncate(parts_a, parts_b, max_length=self.wrapper.config.max_seq_length)
         num_special = self.wrapper.tokenizer.num_special_tokens_to_add(bool(parts_b))
         self.truncate(parts_a, parts_b, max_length=self.wrapper.config.max_seq_length - num_special)
 
         tokens_a = [token_id for part, _ in parts_a for token_id in part]
-        # tokens_b = [token_id for part, _ in parts_b for token_id in part] if parts_b else None
         tokens_b = [token_id for part, _ in parts_b for token_id in part] if parts_b else []
 
         ### add

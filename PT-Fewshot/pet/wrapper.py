@@ -608,8 +608,9 @@ class TransformerModelWrapper:
     def mlm_train_step(self, labeled_batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Perform a MLM training step."""
         inputs = self.generate_default_inputs(labeled_batch)
-        mlm_labels, labels = labeled_batch['mlm_labels'], labeled_batch['labels']
         outputs = self.model(**inputs)
+
+        mlm_labels, labels = labeled_batch['mlm_labels'], labeled_batch['labels']
         prediction_scores = self.preprocessor.pvp.convert_mlm_logits_to_cls_logits(mlm_labels, outputs[0])
         loss = nn.CrossEntropyLoss()(prediction_scores.view(-1, len(self.config.label_list)), labels.view(-1))
 
