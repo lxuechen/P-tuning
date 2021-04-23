@@ -13,9 +13,9 @@ class PromptEncoder(torch.nn.Module):
         # ent embedding
         self.cloze_length = template
         self.cloze_mask = [
-            [1] * self.cloze_length[0]  # first cloze
-            + [1] * self.cloze_length[1]  # second cloze
-            + [1] * self.cloze_length[2]  # third cloze
+            [1] * self.cloze_length[0] +
+            [1] * self.cloze_length[1] +
+            [1] * self.cloze_length[2]
         ]
         self.cloze_mask = torch.LongTensor(self.cloze_mask).bool().to(self.device)
 
@@ -29,10 +29,12 @@ class PromptEncoder(torch.nn.Module):
                                        dropout=self.args.lstm_dropout,
                                        bidirectional=True,
                                        batch_first=True)
-        self.mlp_head = nn.Sequential(nn.Linear(self.hidden_size, self.hidden_size),
-                                      nn.ReLU(),
-                                      nn.Linear(self.hidden_size, self.hidden_size))
-        print("init prompt encoder...")
+
+        self.mlp_head = nn.Sequential(
+            nn.Linear(self.hidden_size, self.hidden_size),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size, self.hidden_size)
+        )
 
     def forward(self):
         input_embeds = self.embedding(self.seq_indices).unsqueeze(0)
