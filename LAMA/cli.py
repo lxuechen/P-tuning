@@ -45,6 +45,7 @@ def construct_generation_args():
     parser.add_argument("--decay_rate", type=float, default=0.98)
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
+    parser.add_argument('--epochs', type=int, default=100)
 
     # lama configuration
     parser.add_argument("--only_evaluate", type=bool, default=False)
@@ -169,7 +170,7 @@ class Trainer(object):
         path = self.get_save_path()
         os.makedirs(path, exist_ok=True)
         torch.save(best_ckpt, join(path, ckpt_name))
-        print("# Prompt:", self.model.prompt)
+        print("# Prompt:", self.model.prompt_encoder)
         print("# {} Checkpoint {} saved.".format(self.args.relation_id, ckpt_name))
 
     def train(self):
@@ -181,7 +182,7 @@ class Trainer(object):
         optimizer = torch.optim.Adam(params, lr=self.args.lr, weight_decay=self.args.weight_decay)
         my_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.args.decay_rate)
 
-        for epoch_idx in range(100):
+        for epoch_idx in range(self.args.epochs):
             # check early stopping
             if epoch_idx > -1:
                 dev_loss, dev_hit1 = self.evaluate(epoch_idx, 'Dev')
