@@ -1,17 +1,16 @@
-import json
-import os
-import torch
 import argparse
-import numpy as np
-
-from torch.utils.data import DataLoader
+import os
 from datetime import datetime
+from os.path import join
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-from os.path import join, abspath, dirname
-
-from LAMA.data_utils.dataset import load_file, LAMADataset
+from LAMA.data_utils.dataset import LAMADataset
+from LAMA.data_utils.dataset import load_file
 from LAMA.data_utils.vocab import init_vocab
 from LAMA.p_tuning.modeling import PTuneForLAMA
 
@@ -56,14 +55,16 @@ def construct_generation_args():
     parser.add_argument("--lstm_dropout", type=float, default=0.0)
 
     # directories
-    parser.add_argument("--data_dir", type=str, default=join(abspath(dirname(__file__)), '../data/LAMA'))
-    parser.add_argument("--out_dir", type=str, default=join(abspath(dirname(__file__)), '../out/LAMA'))
+    parser.add_argument("--data_dir", type=str, default=None, required=True)
+    parser.add_argument("--out_dir", type=str, default=None, required=True)
+
     # MegatronLM 11B
-    parser.add_argument("--checkpoint_dir", type=str, default=join(abspath(dirname(__file__)), '../checkpoints'))
+    parser.add_argument("--checkpoint_dir", type=str, default=None)
 
     args = parser.parse_args()
 
-    # post-parsing args
+    if "megatron" in args.model_name and args.checkpoint_dir is None:
+        raise ValueError(f"Specify megatron checkpoint via `checkpoint_dir`.")
 
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
     args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()

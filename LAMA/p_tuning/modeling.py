@@ -1,14 +1,15 @@
-import torch
-from torch.nn.utils.rnn import pad_sequence
+import re
 from os.path import join
 
-import re
-
+import torch
+from torch.nn.utils.rnn import pad_sequence
 from transformers import AutoTokenizer
 
-from LAMA.p_tuning.models import get_embedding_layer, create_model
-from LAMA.data_utils.vocab import get_vocab_by_strategy, token_wrapper
 from LAMA.data_utils.dataset import load_file
+from LAMA.data_utils.vocab import get_vocab_by_strategy
+from LAMA.data_utils.vocab import token_wrapper
+from LAMA.p_tuning.models import create_model
+from LAMA.p_tuning.models import get_embedding_layer
 from LAMA.p_tuning.prompt_encoder import PromptEncoder
 
 
@@ -21,7 +22,8 @@ class PTuneForLAMA(torch.nn.Module):
 
         # load relation templates
         self.relation_templates = dict(
-            (d['relation'], d['template']) for d in load_file(join(self.args.data_dir, 'relations.jsonl')))
+            (d['relation'], d['template']) for d in load_file(join(self.args.data_dir, 'relations.jsonl'))
+        )
 
         # load tokenizer
         tokenizer_src = 'roberta-large' if 'megatron' in self.args.model_name else self.args.model_name
@@ -48,7 +50,10 @@ class PTuneForLAMA(torch.nn.Module):
         self.hidden_size = self.embeddings.embedding_dim
         self.tokenizer.add_special_tokens({'additional_special_tokens': [self.args.pseudo_token]})
         self.pseudo_token_id = self.tokenizer.get_vocab()[self.args.pseudo_token]
-        self.pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.unk_token_id
+        if self.tokenizer.pad_token_id is not None:
+            self.pad_token_id = self.tokenizer.pad_token_id
+        else:
+            self.pad_token_id = self.tokenizer.unk_token_id
 
         self.spell_length = sum(self.template)
         self.prompt_encoder = PromptEncoder(self.template, self.hidden_size, self.tokenizer, self.device, args)
@@ -78,29 +83,31 @@ class PTuneForLAMA(torch.nn.Module):
                 query = re.sub(r'\[Y\].*', '', self.relation_templates[self.args.relation_id].replace('[X]', x_h))
                 return self.tokenizer(' ' + query)['input_ids']
             else:
-                query = self.relation_templates[self.args.relation_id].replace('[X]', x_h).replace('[Y]',
-                                                                                                   self.tokenizer.mask_token)
+                query = self.relation_templates[self.args.relation_id]
+                query = query.replace('[X]', x_h).replace('[Y]', self.tokenizer.mask_token)
                 return self.tokenizer(' ' + query)['input_ids']
         # For P-tuning
         if 'gpt' not in self.args.model_name and 'megatron' not in self.args.model_name:
             # BERT-style model
-            return [[self.tokenizer.cls_token_id]  # [CLS]
-                    + prompt_tokens * self.template[0]
-                    + [self.tokenizer.mask_token_id]  # head entity
-                    + prompt_tokens * self.template[1]
-                    + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # [MASK] (tail entity)
-                    + (prompt_tokens * self.template[2] if self.template[
-                                                               2] > 0 else self.tokenizer.convert_tokens_to_ids(['.']))
-                    + [self.tokenizer.sep_token_id]
-                    ]
+            return [
+                [self.tokenizer.cls_token_id]  # [CLS]
+                + prompt_tokens * self.template[0]
+                + [self.tokenizer.mask_token_id]  # head entity
+                + prompt_tokens * self.template[1]
+                + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # [MASK] (tail entity)
+                + (prompt_tokens * self.template[2] if self.template[2] > 0 else self.tokenizer.convert_tokens_to_ids(
+                    ['.']))
+                + [self.tokenizer.sep_token_id]
+            ]
         elif 'gpt' in self.args.model_name or 'megatron' in self.args.model_name:
             # GPT-style models
-            return [prompt_tokens * self.template[0]
-                    + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # head entity
-                    + prompt_tokens * self.template[1]
-                    + (self.tokenizer.convert_tokens_to_ids(
-                self.tokenizer.tokenize(' ' + x_t)) if x_t is not None else [])
-                    ]
+            return [
+                prompt_tokens * self.template[0]
+                + self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(' ' + x_h))  # head entity
+                + prompt_tokens * self.template[1]
+                + (self.tokenizer.convert_tokens_to_ids(
+                    self.tokenizer.tokenize(' ' + x_t)) if x_t is not None else [])
+            ]
         else:
             raise NotImplementedError("The query template for {} has not been defined.".format(self.args.model_name))
 
