@@ -137,8 +137,11 @@ class Trainer(object):
                 hit1 += _hit1
                 loss += loss.item()
             hit1 /= len(dataset)
-            print("{} {} Epoch {} Loss: {} Hit@1:".format(self.args.relation_id, evaluate_type, epoch_idx,
-                                                          loss / len(dataset)), hit1)
+            print(
+                f"{self.args.relation_id} {evaluate_type} "
+                f"Epoch {epoch_idx} Loss: {loss / len(dataset):.4f} Hit@1:{hit1:.4f}"
+            )
+
         return loss, hit1
 
     def get_task_name(self):
