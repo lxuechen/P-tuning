@@ -10,27 +10,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
 import json
 import os
 import statistics
 from collections import defaultdict
-from typing import List, Dict
+from typing import Dict
+from typing import List
 
+import log
 import numpy as np
 import torch
+from pet.config import EvalConfig
+from pet.config import TrainConfig
+from pet.config import WrapperConfig
+from pet.utils import exact_match
+from pet.utils import InputExample
+from pet.utils import save_logits
+from pet.utils import save_predictions
+from pet.utils import set_seed
+from pet.wrapper import TransformerModelWrapper
 from sklearn.metrics import f1_score
 from transformers.data.metrics import simple_accuracy
 
-import log
-from pet.config import EvalConfig, TrainConfig
-from pet.utils import InputExample, exact_match, save_logits, save_predictions, softmax, LogitsList, set_seed, eq_div
-from pet.wrapper import TransformerModelWrapper
-from pet.config import  WrapperConfig
-
 logger = log.get_logger('root')
-
-
 
 
 def init_model(config: WrapperConfig) -> TransformerModelWrapper:
@@ -53,7 +55,6 @@ def train_pet(train_data: List[InputExample],
               do_eval: bool = True,
               seed: int = 42
               ):
-
     """
     Train and evaluate a new PET model for a given task.
 
@@ -123,7 +124,8 @@ def train_pet(train_data: List[InputExample],
                 save_predictions(os.path.join(pattern_iter_output_dir, 'eval_predictions.jsonl'), wrapper, eval_result)
                 save_logits(os.path.join(pattern_iter_output_dir, 'eval_logits.txt'), eval_result['logits'])
 
-                save_predictions(os.path.join(pattern_iter_output_dir, 'dev32_predictions.jsonl'), wrapper, dev32_result)
+                save_predictions(os.path.join(pattern_iter_output_dir, 'dev32_predictions.jsonl'), wrapper,
+                                 dev32_result)
                 save_logits(os.path.join(pattern_iter_output_dir, 'dev32_logits.txt'), dev32_result['logits'])
 
                 logger.info("--- RESULT (pattern_id={}, iteration={}) ---".format(pattern_id, iteration))
@@ -206,7 +208,6 @@ def train_single_model(train_data: List[InputExample],
 def evaluate(model: TransformerModelWrapper,
              eval_data: List[InputExample],
              config: EvalConfig) -> Dict:
-
     metrics = config.metrics if config.metrics else ['acc']
     results = model.eval(eval_data=eval_data,
                          per_gpu_eval_batch_size=config.per_gpu_eval_batch_size,
@@ -217,6 +218,8 @@ def evaluate(model: TransformerModelWrapper,
         if metric == 'acc':
             scores[metric] = simple_accuracy(predictions, results['labels'])
         elif metric == 'f1':
+            # TODO: Solely for debugging.
+            print(results['labels'], predictions)
             scores[metric] = f1_score(results['labels'], predictions)
         elif metric == 'f1-macro':
             scores[metric] = f1_score(results['labels'], predictions, average='macro')
@@ -270,4 +273,3 @@ def _write_results(path: str, all_results: Dict, dev32_results: Dict):
             result_str = "{}-all-p: {} +- {}".format(metric, all_mean, all_stdev)
             logger.info(result_str)
             fh.write(result_str + '\n')
-
